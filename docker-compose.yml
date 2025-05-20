@@ -1,0 +1,50 @@
+version: '3.8'
+networks:
+  avatar-network:
+    driver: bridge
+services:
+  backend:
+    build: .
+    container_name: fastapi_backend
+    expose:
+      - '8000'
+    env_file:
+      - .env
+    volumes:
+      - ./com/mhire/app/services/audio_service/audio_assets:/app/com/mhire/app/services/audio_service/audio_assets
+      - ./com/mhire/app/services/video_service/video_assets:/app/com/mhire/app/services/video_service/video_assets
+    networks:
+      - avatar-network
+    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: streamlit_frontend
+    depends_on:
+      - backend
+    ports:
+      - '8501:8501'
+    volumes:
+      - ./com/mhire/app/ui:/app/com/mhire/app/ui
+      - ./com/mhire/app/services/audio_service/audio_assets:/app/com/mhire/app/services/audio_service/audio_assets
+      - ./com/mhire/app/services/video_service/video_assets:/app/com/mhire/app/services/video_service/video_assets
+    networks:
+      - avatar-network
+    restart: unless-stopped
+    command: streamlit run /app/com/mhire/app/ui/app.py
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    ports:
+      - '80:80'
+    networks:
+      - avatar-network
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./com/mhire/app/services/audio_service/audio_assets:/usr/share/nginx/html/audio-assets
+      - ./com/mhire/app/services/video_service/video_assets:/usr/share/nginx/html/video-assets
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
